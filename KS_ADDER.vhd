@@ -3,10 +3,9 @@ USE ieee.std_logic_1164.ALL;
 USE ieee.numeric_std.ALL;
 USE ieee.math_real.ALL;
 
-
 ENTITY KS_ADDER IS
    GENERIC (
-      BITS : INTEGER := 4
+      BITS : INTEGER := 32
    );
    PORT (
       i_CIN : IN STD_LOGIC;
@@ -16,12 +15,12 @@ ENTITY KS_ADDER IS
    );
 END KS_ADDER;
 
-ARCHITECTURE row_version OF KS_ADDER IS
+ARCHITECTURE rtl OF KS_ADDER IS
    CONSTANT DEPTH : INTEGER := INTEGER(ceil(log2(real(BITS))));
-   TYPE arr IS ARRAY(INTEGER RANGE 0 TO DEPTH + 1) OF STD_LOGIC_VECTOR(0 TO BITS - 1);
+   TYPE arr IS ARRAY(INTEGER RANGE 0 TO DEPTH) OF STD_LOGIC_VECTOR(0 TO BITS - 1);
    SIGNAL s_P, s_G : arr := (OTHERS => (OTHERS => '0'));
 BEGIN
-   gen_row : FOR i IN 0 TO DEPTH+1 GENERATE
+   gen_row : FOR i IN 0 TO DEPTH + 1 GENERATE
       gen_col : FOR j IN 0 TO BITS - 1 GENERATE
          pre_processing : IF i = 0 GENERATE
             R : ENTITY work.red PORT MAP (
@@ -31,7 +30,7 @@ BEGIN
                o_G => s_G(0)(j)
                );
          END GENERATE;
-         carry_look_ahead_net : IF i > 0 GENERATE
+         carry_look_ahead_net : IF i > 0 and i < DEPTH + 1 GENERATE
             -- Green
             gen_G : IF j < 2 ** (i - 1) GENERATE
                G : ENTITY work.Green PORT MAP(
@@ -53,7 +52,7 @@ BEGIN
                   );
             END GENERATE;
          END GENERATE;
-         post_processing : IF i = DEPTH+1 GENERATE 
+         post_processing : IF i = DEPTH + 1 GENERATE 
             S0 : IF j = 0 GENERATE o_S(j) <= s_P(0)(j) XOR i_CIN;
             END GENERATE;
             S : IF j > 0 GENERATE o_S(j) <= s_P(0)(j) XOR s_G(i - 1)(j - 1);
@@ -61,5 +60,5 @@ BEGIN
          END GENERATE;
       END GENERATE;
    END GENERATE;
-   o_COUT <= s_G(DEPTH - 1)(BITS - 1);
-END ARCHITECTURE row_version;
+   o_COUT <= s_G(DEPTH)(BITS - 1) or (i_CIN and s_P(DEPTH)(BITS - 1));
+END ARCHITECTURE rtl;
